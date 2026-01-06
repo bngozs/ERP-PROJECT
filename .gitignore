@@ -1,0 +1,12 @@
+# Sanal ortam
+venv/
+
+# Python geçici dosyaları
+__pycache__/
+*.pyc
+
+# Yerel veritabanı (ERP verileri yerelde kalsın)
+db.sqlite3
+
+# PyCharm ayarları
+.idea/
