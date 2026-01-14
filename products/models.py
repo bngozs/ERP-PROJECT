@@ -95,21 +95,21 @@ class Product(models.Model):
 
     # Akıllı Talep Hesabı
     # Bu özellik, Net İhtiyacı otonomlaştırır.
-        @property
-        def net_requirement(self):
-            """
-            Net İhtiyaç = (Toplam Satış Siparişleri + Emniyet Stoku) - (Mevcut Stok + Devam Eden Üretim)
-            Bu fonksiyon, MRP (Malzeme İhtiyaç Planlaması) içindir.
-            """
-            # 1. Sevk edilmemiş toplam müşteri talebi
-            total_demand = sum(order.quantity for order in self.salesorder_set.filter(is_shipped=False))
+    @property
+    def net_requirement(self):
+        """
+        Net İhtiyaç = (Toplam Satış Siparişleri + Emniyet Stoku) - (Mevcut Stok + Devam Eden Üretim)
+        Bu fonksiyon, MRP (Malzeme İhtiyaç Planlaması) içindir.
+        """
+        # 1. Sevk edilmemiş toplam müşteri talebi
+        total_demand = sum(order.quantity for order in self.salesorder_set.filter(is_shipped=False))
 
-            # 2. Şu an üretimde olan miktar
-            in_production = sum(order.planned_quantity - order.actual_quantity for order in self.productionorder_set.filter(status__in=['PLANNED', 'IN_PROGRESS']))
+        # 2. Şu an üretimde olan miktar
+        in_production = sum(order.planned_quantity - order.actual_quantity for order in self.productionorder_set.filter(status__in=['PLANNED', 'IN_PROGRESS']))
 
-            # Formülasyon
-            requirement = (total_demand + self.min_stock_level) - (self.stock_quantity + in_production)
-            return max(requirement, Decimal('0'))  # İhtiyaç negatif çıkamaz.
+        # Formülasyon
+        requirement = (total_demand + self.min_stock_level) - (self.stock_quantity + in_production)
+        return max(requirement, Decimal('0'))  # İhtiyaç negatif çıkamaz.
 
 
     # Otonom Stok Kontrolü
@@ -131,7 +131,7 @@ class Product(models.Model):
                 (op.setup_time + op.cycle_time) / op.work_center.efficiency_factor
                 for op in self.bom_header.operations.all()
              )
-            return round(total, 2)
+        return round(total, 2)
         return 0
 
 
@@ -204,7 +204,7 @@ class WorkCenter(models.Model):
     name = models.CharField(max_length=100, verbose_name="Üretim Merkezi Adı")
     # Günlük çalışma saati: Kapasite planlama için kullanılır.
     daily_capacity_hours = models.DecimalField(max_digits=5, decimal_places=2, default=8.0, verbose_name="Günlük Kapasite (Saat)")
-    hourly_rate = models.DecimalField( max_digits=10, decimal_places=2, default=100.0, verbose_name="Saatlik Maliyet (TL/Saat)"
+    hourly_rate = models.DecimalField( max_digits=10, decimal_places=2, default=100.0, verbose_name="Saatlik Maliyet (TL/Saat)")
 
     # Otonom Verimlilik Hesabı
     # Property: Kullanıcının girmesine gerek kalmadan, sistemdeki geçmiş kayıtlara bakarak verimliliği hesaplar.
@@ -289,6 +289,39 @@ class Operation(models.Model):
 
         def __str__(self):
             return f"{self.bom.parent_product.name} - Adım {self.step_number}: {self.description}"
+
+# VARDİYA: Üretimin hangi zaman diliminde yapıldığını takip eder.
+class Shift(models.Model):
+    name = models.CharField(max_length=50, verbose_name="Vardiya Adı") # Örn: Sabah, Akşam, Gece
+    start_time = models.TimeField(verbose_name="Başlangıç Saati")
+    end_time = models.TimeField(verbose_name="Bitiş Saati")
+
+    def __str__(self):
+        return self.name
+# Personel: Üretim sahasında çalışan operatörler.
+class Employee(models.Model):
+    first_name = models.CharField(max_length=50, verbose_name="Adı")
+    last_name = models.CharField(max_length=50, verbose_name="Soyadı")
+    employee_id = models.CharField(max_length=20, unique=True, verbose_name="Sicil No")
+    # Operatörün uzmanlık alanı (Örn: Kaynakçı, Montajcı). - Yeni
+    skill_set = models.CharField(max_length=100, blank=True, verbose_name="Uzmanlık Alanı")
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+# DEPO: Ürünlerin fiziksel olarak nerede tutulduğunu belirler.
+class Warehouse(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Depo Adı")
+    # Depo tipi (Örn: Hammadde, Yarı Mamul, Hurdalık).
+    warehouse_type = models.CharField(max_length=20, choices=[
+        ('RAW', 'Hammadde Deposu'),
+        ('WIP', 'Ara Stok (İşlem Sırası)'),
+        ('FINAL', 'Mamul Deposu'),
+        ('SCRAP', 'Hurda Deposu'),
+    ], verbose_name="Depo Tipi")
+
+    def __str__(self):
+        return self.name
 
 # Üretim Kaydı: Makinelerin performansını ölçmek için gerçekleşen üretimlerin loglandığı yer.
 class ProductionLog(models.Model):
@@ -445,21 +478,6 @@ class StockTransaction(models.Model):
         verbose_name_plural = "Stok Hareketleri"
 
 
-# DEPO: Ürünlerin fiziksel olarak nerede tutulduğunu belirler.
-class Warehouse(models.Model):
-    name = models.CharField(max_length=100, verbose_name="Depo Adı")
-    # Depo tipi (Örn: Hammadde, Yarı Mamul, Hurdalık).
-    warehouse_type = models.CharField(max_length=20, choices=[
-        ('RAW', 'Hammadde Deposu'),
-        ('WIP', 'Ara Stok (İşlem Sırası)'),
-        ('FINAL', 'Mamul Deposu'),
-        ('SCRAP', 'Hurda Deposu'),
-    ], verbose_name="Depo Tipi")
-
-    def __str__(self):
-        return self.name
-
-
 # KALİTE KONTROL: Üretilen ürünlerin standartlara uygunluğunu denetler.
 class QualityCheck(models.Model):
     # Hangi üretim emrinden gelen ürünler kontrol ediliyor?
@@ -484,19 +502,6 @@ class QualityCheck(models.Model):
     def __str__(self):
         return f"Kalite Kontrol #{self.id} - Skor: %{self.quality_score:.1f}"
 
-
-# --- YENİ EKLENDİ ---
-# Personel: Üretim sahasında çalışan operatörler.
-class Employee(models.Model):
-    first_name = models.CharField(max_length=50, verbose_name="Adı")
-    last_name = models.CharField(max_length=50, verbose_name="Soyadı")
-    employee_id = models.CharField(max_length=20, unique=True, verbose_name="Sicil No")
-    # Operatörün uzmanlık alanı (Örn: Kaynakçı, Montajcı). - Yeni
-    skill_set = models.CharField(max_length=100, blank=True, verbose_name="Uzmanlık Alanı")
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
-
 # MAKİNE BAKIM: Makinelerin arıza ve bakım kayıtlarını tutar.
 class Maintenance(models.Model):
     MAINTENANCE_TYPES = [
@@ -516,7 +521,6 @@ class Maintenance(models.Model):
         return f"{self.work_center.name} - {self.get_maintenance_type_display()}"
 
 
-# --- YENİ EKLENDİ ---
 # Müşteri: Ürünlerimizi satan aldığımız kurumlar veya kişiler.
 class Customer(models.Model):
     name = models.CharField(max_length=255, verbose_name="Müşteri/Firma Adı")
@@ -542,34 +546,5 @@ class SalesOrder(models.Model):
         return f"Sipariş #{self.id} - {self.customer.name}"
 
 
-# Product Modeline Akıllı Talep Hesabı) ---
-# Bu özellik, IE'deki "Net Requirement" (Net İhtiyaç) mantığını otonomlaştırır.
-class Product(models.Model):
-    # ... (Önceki alanların hepsi kalıyor) ...
 
-    @property
-    def net_requirement(self):
-        """
-        Net İhtiyaç = (Toplam Satış Siparişleri + Emniyet Stoku) - (Mevcut Stok + Devam Eden Üretim)
-        Bu fonksiyon, MRP (Malzeme İhtiyaç Planlaması) için beynin en kritik noktasıdır. - Yeni
-        """
-        # 1. Sevk edilmemiş toplam müşteri talebi
-        total_demand = sum(order.quantity for order in self.salesorder_set.filter(is_shipped=False))
 
-        # 2. Şu an üretimde olan miktar
-        in_production = sum(order.planned_quantity - order.actual_quantity for order in
-                            self.productionorder_set.filter(status__in=['PLANNED', 'IN_PROGRESS']))
-
-        # Formülü uygula
-        requirement = (total_demand + self.min_stock_level) - (self.stock_quantity + in_production)
-
-        return max(requirement, Decimal('0'))  # İhtiyaç negatif çıkamaz.
-
-# VARDİYA: Üretimin hangi zaman diliminde yapıldığını takip eder.
-class Shift(models.Model):
-    name = models.CharField(max_length=50, verbose_name="Vardiya Adı") # Örn: Sabah, Akşam, Gece
-    start_time = models.TimeField(verbose_name="Başlangıç Saati")
-    end_time = models.TimeField(verbose_name="Bitiş Saati")
-
-    def __str__(self):
-        return self.name
