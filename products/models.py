@@ -5,15 +5,8 @@ from datetime import date
 # Django'ya Category adında bir veritabanı tablosu oluşturtulur.
 class Category(models.Model):
     # Kendi tablosuna bağlanarak hiyerarşik (Alt-Üst) kategori yapısı kurulur.
-    parent = models.ForeignKey(
-        'self',
-        # CASCADE: Referans verilen nesne silindiğinde, ona referans veren nesneleri de silin.
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='subcategories',
-        verbose_name="Üst Kategori"
-    )
+    # CASCADE: Referans verilen nesne silindiğinde, ona referans veren nesneleri de silin.
+    parent = models.ForeignKey( 'self', on_delete=models.CASCADE, null=True, blank=True, related_name='subcategories', verbose_name="Üst Kategori")
     # Kurumsal takip için benzersiz kategori kodu.
     code = models.CharField(max_length=20, unique=True, null=True, blank=True, verbose_name="Kategori Kodu")
     # Kategorinin adı ve maksimum uzunluğu bu kısımda ayarlanır.
@@ -46,46 +39,41 @@ class Product(models.Model):
 
     PRODUCT_TYPES = [
         # 1. Temel Üretim Tipleri
-        ('RAW', 'Raw Material (Hammadde)'),
-        ('SEMI', 'Semi-Finished (Yarı Mamul)'),
-        ('FINAL', 'Finished Good (Mamul)'),
+        ('RAW', 'Hammadde'),
+        ('SEMI', 'Yarı Mamul'),
+        ('FINAL', 'Mamul'),
 
         # 2. Ticari ve Destekleyici Tipler
         # TRAD: Üretimden geçmez. Direkt satın alınır ve satılır. Direkt "Satın Alma Talebi" olarak görür.
-        ('TRAD', 'Trading Good (Ticari Mal)'),
+        ('TRAD', 'Ticari Mal'),
         # CONS: Ürün ağacına (BOM) genelde girmez. Ancak stok seviyesi düştüğünde uyarı vermesi gerekir.
-        ('CONS', 'Consumable (Sarf Malzeme)'),
+        ('CONS', 'Sarf Malzeme'),
         #MRO: Fabrikadaki makinelerin bakımı için gereken yedek parçalardır.
-        ('MRO', 'MRO - Maintenance & Repair (İşletme Malzemesi)'),
+        ('MRO', 'İşletme Malzemesi'),
 
         # 3. Hizmet ve Yan Ürünler
         # SRVC: Fiziksel stok tutulmaz. Nakliye bedeli veya dış fason işçilik gibi kalemleri ürün maliyetine eklemek için kullanılır.
-        ('SRVC', 'Service (Hizmet)'),
+        ('SRVC', 'Hizmet'),
         # SCRP: Üretim sonunda ortaya çıkar.
-        ('SCRP', 'Scrap/Waste (Hurda/Atık)'),
+        ('SCRP', 'Hurda/Atık'),
         # Lojistik planlamasında ürünün hacmi ve paketleme malzemesi ihtiyacı için kritiktir.
-        ('PACK', 'Packaging (Paketleme Malzemesi)'),
+        ('PACK', 'Paketleme Malzemesi'),
     ]
 
     # ForeignKey: Bu ürünün, daha önce tanımladığımız Category tablosundan birine ait olduğunu söyler.
     # on_delete=models.SET_NULL: Bir kategori silinince o kategoriye ait verilerin silinmesini önler. set null: boş bırak
     # Related_name: Bir kategori üzerinden o kategoriye ait tüm ürünlere -category.products.all()- tek komutla ulaşmanı sağlar.
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name="products")
-
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name="products", verbose_name="Ürünler")
     # CharField: Kısa metinler için kullanılır.
     name = models.CharField(max_length=255, verbose_name="Ürün Adı")
-
     # sku (Stock Keeping Unit): Ürünün barkod numarası veya stok kodudur.
     # unique = True ile eşsiz olması yani aynı ürünün girilmesi engellenir.
-    sku = models.CharField(max_length=50, unique=True, verbose_name="Stok Kodu (SKU)")
-
+    sku = models.CharField(max_length=50, unique=True, verbose_name="Stok Kodu")
     # default='RAW': Eğer tip seçilmezse, sistem bunu otomatik olarak "Hammadde" olarak kaydeder.
     product_type = models.CharField(max_length=10, choices=PRODUCT_TYPES, default='RAW', verbose_name="Ürün Tipi")
-
     # DecimalField: FloatField bazen hassas hesaplamalarda hata yapabilir. Bu yüzden DecimalField kullanılır.
     price = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Birim Fiyat")
     stock_quantity = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Stok Miktarı")
-
     # MRP ve Planlama Parametreleri
     unit_of_measure = models.CharField(max_length=10, choices=UOM_CHOICES, default='UNIT', verbose_name="Ölçü Birimi")
     # Tedarik veya üretim süresi (Gün cinsinden). MRP hesaplamasında teslim tarihini bulmak için kullanılır.
@@ -117,10 +105,10 @@ class Product(models.Model):
     def stock_status(self):
         """Ürünün stok miktarını kritik seviye ile kıyaslayarak durum raporu döner."""
         if self.stock_quantity <= 0:
-            return "STOK TÜKENDİ"
+            return "STOK TÜKENDİ!"
         elif self.stock_quantity <= self.min_stock_level:
-            return "KRİTİK SEVİYE"
-        return "GÜVENLİ"
+            return "KRİTİK SEVİYE!"
+        return "GÜVENLİ."
 
     # Otonom Rota Süresi Hesabı
     @property
@@ -134,32 +122,32 @@ class Product(models.Model):
         return round(total, 2)
         return 0
 
+    class Meta:
+        verbose_name = "Üretim"  # Tekil ismi
+        verbose_name_plural = "Üretimler"  # Çoğul ismi
 
     def __str__(self):
         return f"[{self.get_product_type_display()}] {self.name}"
+
 
 # Ürün Ağacı oluşturma
 class BOM(models.Model):
     # OneToOneField: Bir ürünün sadece bir tane ana reçetesi olabilir.
     # Eğer ForeignKey kullansaydık, bir bisiklet için 5 farklı reçete tanımlanabilirdi.
-    parent_product = models.OneToOneField(
-        Product,
-        # Eğer ana ürün sistemden silinirse, ona bağlı olan bu reçete kartı da otomatik olarak silinir.
-        on_delete=models.CASCADE,
-        # bom_header: Ürün üzerinden reçeteye ulaşmak istediğinde kullanacağın isimdir.
-        related_name="bom_header",
-        # BOM oluştururken kullanıcıya sadece Yarı Mamul (SEMI) ve Mamullar (FINAL) listesini göster.
-        # Hammadde (RAW) dışarıdan satın alındığı için onun bir reçetesi olamaz.
-        limit_choices_to={'product_type__in': ['SEMI', 'FINAL']},
-        verbose_name="Üretilecek Ürün"
-    )
-
+    # Eğer ana ürün sistemden silinirse, ona bağlı olan bu reçete kartı da otomatik olarak silinir.
+    # bom_header: Ürün üzerinden reçeteye ulaşmak istediğinde kullanacağın isimdir.
+    # BOM oluştururken kullanıcıya sadece Yarı Mamul (SEMI) ve Mamullar (FINAL) listesini göster.
+    # Hammadde (RAW) dışarıdan satın alındığı için onun bir reçetesi olamaz.
+    parent_product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="bom_header", limit_choices_to={'product_type__in': ['SEMI', 'FINAL']}, verbose_name="Üretilecek Ürün")
     # Reçetenin versiyonu (Örn: v1.0, v1.1).
     version = models.CharField(max_length=10, default="1.0", verbose_name="Versiyon")
     # Şu an bu reçete mi kullanılıyor?
     is_active = models.BooleanField(default=True, verbose_name="Aktif Reçete mi?")
     description = models.TextField(blank=True, verbose_name="Üretim Notları")
 
+    class Meta:
+        verbose_name = "Ürün Ağacı"  # Tekil ismi
+        verbose_name_plural = "Ürün Ağaçları"  # Çoğul ismi
     def __str__(self):
         return f"BOM: {self.parent_product.name} (v{self.version})"
 
@@ -193,6 +181,9 @@ class BOMItem(models.Model):
         multiplier = Decimal('1') - (self.scrap_factor / Decimal('100'))
         return self.quantity / multiplier
 
+    class Meta:
+        verbose_name = "Ürün Ağacı Kalemi"  # Tekil ismi
+        verbose_name_plural = "Ürün Ağacı Kalemleri"  # Çoğul ismi
     def __str__(self):
         return f"{self.child_product.name} ({self.quantity})"
 
@@ -205,6 +196,9 @@ class WorkCenter(models.Model):
     # Günlük çalışma saati: Kapasite planlama için kullanılır.
     daily_capacity_hours = models.DecimalField(max_digits=5, decimal_places=2, default=8.0, verbose_name="Günlük Kapasite (Saat)")
     hourly_rate = models.DecimalField( max_digits=10, decimal_places=2, default=100.0, verbose_name="Saatlik Maliyet (TL/Saat)")
+    class Meta:
+        verbose_name = "Üretim Merkezi"  # Tekil ismi
+        verbose_name_plural = "Üretim Merkezleri"  # Çoğul ismi
 
     # Otonom Verimlilik Hesabı
     # Property: Kullanıcının girmesine gerek kalmadan, sistemdeki geçmiş kayıtlara bakarak verimliliği hesaplar.
@@ -234,8 +228,12 @@ class WorkCenter(models.Model):
         return f"{self.name} (Verimlilik: %{self.efficiency_factor * 100:.1f})"
 
     # Verimlilik Faktörü: Makinenin ne kadar efektif çalıştığını gösterir.
-    efficiency_factor = models.DecimalField(max_digits=3, decimal_places=2, default=0.90, verbose_name="Verimlilik Faktörü")
-
+    efficiency_factor = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0.90,
+        verbose_name="Verimlilik Faktörü"
+    )
     def __str__(self):
         return f"{self.name} (Verimlilik: %{self.efficiency_factor * 100:.1f})"
 
@@ -296,6 +294,10 @@ class Shift(models.Model):
     start_time = models.TimeField(verbose_name="Başlangıç Saati")
     end_time = models.TimeField(verbose_name="Bitiş Saati")
 
+    class Meta:
+        verbose_name = "Vardiya"  # Tekil ismi
+        verbose_name_plural = "Vardiyalar"  # Çoğul ismi
+
     def __str__(self):
         return self.name
 # Personel: Üretim sahasında çalışan operatörler.
@@ -306,6 +308,9 @@ class Employee(models.Model):
     # Operatörün uzmanlık alanı (Örn: Kaynakçı, Montajcı). - Yeni
     skill_set = models.CharField(max_length=100, blank=True, verbose_name="Uzmanlık Alanı")
 
+    class Meta:
+        verbose_name = "Operatör"  # Tekil ismi
+        verbose_name_plural = "Operatörler"  # Çoğul ismi
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
@@ -320,6 +325,9 @@ class Warehouse(models.Model):
         ('SCRAP', 'Hurda Deposu'),
     ], verbose_name="Depo Tipi")
 
+    class Meta:
+        verbose_name = "Depo"  # Tekil ismi
+        verbose_name_plural = "Depolar"  # Çoğul ismi
     def __str__(self):
         return self.name
 
@@ -343,6 +351,9 @@ class ProductionLog(models.Model):
     scrap_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Hurda Miktarı")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Kayıt Tarihi")
 
+    class Meta:
+        verbose_name = "Üretim Kaydı"  # Tekil ismi
+        verbose_name_plural = "Üretim Kayıtları"  # Çoğul ismi
     def __str__(self):
         return f"{self.work_center.name} Kaydı - {self.created_at}"
 
@@ -437,6 +448,9 @@ class ProductionLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Kayıt Tarihi")
     operator = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, verbose_name="Operatör")
 
+    class Meta:
+        verbose_name = "Üretim Kaydı"  # Tekil ismi
+        verbose_name_plural = "Üretim Kayıtları"  # Çoğul ismi
     def __str__(self):
         return f"{self.work_center.name} - {self.created_at}"
 
@@ -499,6 +513,9 @@ class QualityCheck(models.Model):
             return (self.approved_quantity / self.checked_quantity) * 100
         return 0
 
+    class Meta:
+        verbose_name = "Kalite Kontrol"
+        verbose_name_plural = "Kalite Kontroller"
     def __str__(self):
         return f"Kalite Kontrol #{self.id} - Skor: %{self.quality_score:.1f}"
 
@@ -517,6 +534,9 @@ class Maintenance(models.Model):
     description = models.TextField(verbose_name="Yapılan İşlem")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Bakım Tarihi")
 
+    class Meta:
+        verbose_name = "Makine Bakım"
+        verbose_name_plural = "Makine Bakımları"
     def __str__(self):
         return f"{self.work_center.name} - {self.get_maintenance_type_display()}"
 
@@ -528,6 +548,9 @@ class Customer(models.Model):
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True, verbose_name="Adres")
 
+    class Meta:
+        verbose_name = "Müşteri"
+        verbose_name_plural = "Müşteriler"
     def __str__(self):
         return self.name
 
@@ -542,10 +565,14 @@ class SalesOrder(models.Model):
 
     # Sipariş durum takibi
     is_shipped = models.BooleanField(default=False, verbose_name="Sevk Edildi mi?")
+
+    class Meta:
+        verbose_name = "Sipariş Talebi"
+        verbose_name_plural = "Sipariş Talepleri"
     def __str__(self):
         return f"Sipariş #{self.id} - {self.customer.name}"
 
-# --- YENİ EKLENDİ (Arıza ve Bakım Analizi İçin) ---
+# Arıza ve Bakım Analizi Parametreleri
 class MaintenanceReason(models.Model):
     code = models.CharField(max_length=10, unique=True, verbose_name="Hata Kodu")
     description = models.CharField(max_length=255, verbose_name="Hata Açıklaması")
@@ -556,9 +583,11 @@ class MaintenanceReason(models.Model):
         ('EXTERNAL', 'Dış Kaynaklı'),
     ], verbose_name="Hata Kategorisi")
 
+    class Meta:
+        verbose_name = "Arıza Bakım Nedeni"
+        verbose_name_plural = "Arıza Bakım Nedenleri"
     def __str__(self):
         return f"[{self.code}] {self.description}"
-
 
 # ARIZA BAKIM VE ANALİZİ
 class Maintenance(models.Model):
@@ -574,6 +603,12 @@ class Maintenance(models.Model):
     description = models.TextField(verbose_name="Yapılan İşlem")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Bakım Tarihi")
 
+    class Meta:
+        verbose_name = "Arıza Bakım Analizi"
+        verbose_name_plural = "Arıza Bakım Analizleri"
+    def __str__(self):
+        return f"[{self.reason}] {self.description}"
+
 # Kalite Kontrol Detayları İçin
 class QualityParameter(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="quality_parameters")
@@ -581,10 +616,22 @@ class QualityParameter(models.Model):
     min_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Min. Değer")
     max_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Max. Değer")
 
+    class Meta:
+        verbose_name = "Kalite Kontrol Detayı"
+        verbose_name_plural = "Kalite Kontrol Detayları"
+    def __str__(self):
+        return f"[{self.name}] {self.min_value}"
+
 class QualityMeasurement(models.Model):
-    quality_check = models.ForeignKey(QualityCheck, on_delete=models.CASCADE, related_name="measurements")
+    quality_check = models.ForeignKey(QualityCheck, on_delete=models.CASCADE, related_name='measurements', verbose_name="Kalite Kontrol")
     parameter = models.ForeignKey(QualityParameter, on_delete=models.CASCADE)
     measured_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Ölçülen Değer")
+
+    class Meta:
+        verbose_name = "Kalite Kontrol Ölçümü"
+        verbose_name_plural = "Kalite Kontrol Ölçümleri"
+    def __str__(self):
+        return f"[{self.quality_check}] {self.measured_value}"
 
 
 

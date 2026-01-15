@@ -6,6 +6,10 @@ from .models import (
     Maintenance, MaintenanceReason, QualityParameter, QualityMeasurement
 )
 
+
+admin.site.site_header = "KURUMSAL KAYNAK PLANLAMA YÖNETİM SİSTEMİ"
+admin.site.index_title = "Yönetim Paneli"
+
 # 1. INLINE) MODELLERİ
 # Bu modeller, ana modelin içinde birer satır olarak görünür.
 # Örneğin bir reçete açtığında, malzemeleri tek tek başka sayfaya gitmeden görebilirsin.
