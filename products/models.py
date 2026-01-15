@@ -545,6 +545,46 @@ class SalesOrder(models.Model):
     def __str__(self):
         return f"Sipariş #{self.id} - {self.customer.name}"
 
+# --- YENİ EKLENDİ (Arıza ve Bakım Analizi İçin) ---
+class MaintenanceReason(models.Model):
+    code = models.CharField(max_length=10, unique=True, verbose_name="Hata Kodu")
+    description = models.CharField(max_length=255, verbose_name="Hata Açıklaması")
+    category = models.CharField(max_length=20, choices=[
+        ('MECHANICAL', 'Mekanik'),
+        ('ELECTRICAL', 'Elektriksel'),
+        ('OPERATOR', 'Operatör Kaynaklı'),
+        ('EXTERNAL', 'Dış Kaynaklı'),
+    ], verbose_name="Hata Kategorisi")
+
+    def __str__(self):
+        return f"[{self.code}] {self.description}"
+
+
+# ARIZA BAKIM VE ANALİZİ
+class Maintenance(models.Model):
+    MAINTENANCE_TYPES = [
+        ('PREV', 'Periyodik Bakım'),
+        ('REPAIR', 'Arıza Onarımı'),
+        ('UPGRADE', 'İyileştirme (Kaizen)'),
+    ]
+    work_center = models.ForeignKey(WorkCenter, on_delete=models.CASCADE, related_name="maintenances", verbose_name="Üretim Merkezi")
+    reason = models.ForeignKey(MaintenanceReason, on_delete=models.SET_NULL, null=True, verbose_name="Arıza Nedeni")
+    maintenance_type = models.CharField(max_length=10, choices=MAINTENANCE_TYPES, verbose_name="Bakım Tipi")
+    downtime_minutes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Duruş Süresi (Dakika)")
+    description = models.TextField(verbose_name="Yapılan İşlem")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Bakım Tarihi")
+
+# Kalite Kontrol Detayları İçin
+class QualityParameter(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="quality_parameters")
+    name = models.CharField(max_length=100, verbose_name="Parametre Adı")
+    min_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Min. Değer")
+    max_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Max. Değer")
+
+class QualityMeasurement(models.Model):
+    quality_check = models.ForeignKey(QualityCheck, on_delete=models.CASCADE, related_name="measurements")
+    parameter = models.ForeignKey(QualityParameter, on_delete=models.CASCADE)
+    measured_value = models.DecimalField(max_digits=10, decimal_places=4, verbose_name="Ölçülen Değer")
 
 
 
